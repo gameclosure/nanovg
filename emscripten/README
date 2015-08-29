@@ -1,0 +1,31 @@
+This folder should be a subfolder in nanovg to build correctly
+
+last known good commit is 
+
+/*
+commit 504060e52a47d96cf18530deff221312773c4175
+Merge: 6ae0873 b7a4792
+Author: Mikko Mononen <memononen@gmail.com>
+Date:   Sat Aug 8 17:39:11 2015 +0300
+
+    Merge pull request #238 from plasmacel/master
+
+    fixed type usage
+*/
+
+INSTALLATION
+
+You only have todo this one time.
+
+Step 1.
+
+Replace the files in emscripten with the ones in src
+This includes setting.js and shell.js
+
+Only do this for the version of emscripten described in emscripten-version.txt
+
+Step 2.
+Adjust the build file to point to your emscripten installation
+
+Step 3.
+run ./build :)

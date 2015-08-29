@@ -276,32 +276,13 @@ int NanoVGContext::createTextureFromImage(int sWidth, int sHeight) {
 
 
 void NanoVGContext::drawImage(int mTexture, int sx, int sy, int sWidth, int sHeight, int dx, int dy, int dWidth, int dHeight, int tWidth, int tHeight, float alpha) {
-
-  /*
-  NanoVG implements scale with global translation which is why this does not work atm
-  float scaleX = dWidth/sWidth;
-  float scaleY = dHeight/sHeight;
+  float scaleX = (float)dWidth/(float)sWidth;
+  float scaleY = (float)dHeight/(float)sHeight;
   NVGpaint imgPaint = nvgImagePattern(vg, (-sx*scaleX)+dx, (-sy*scaleY)+dy, tWidth*scaleX, tHeight*scaleY, 0, mTexture, alpha);
-  nvgSave(vg);
   nvgBeginPath(vg);
   nvgRect(vg, dx, dy, dWidth, dHeight);
   nvgFillPaint(vg, imgPaint);
   nvgFill(vg);
-  nvgRestore(vg);
-  */
-
-  // We currently ignore the src dest texture scale and hope the game is drawn correctly
-  // This is most evident on google chrome.
-  float scaleX = dWidth/sWidth;
-  float scaleY = dHeight/sHeight;
-  NVGpaint imgPaint = nvgImagePattern(vg, -sx+dx, -sy+dy, tWidth, tHeight, 0, mTexture, alpha);	
-  nvgSave(vg);
-  nvgBeginPath(vg);
-  nvgRect(vg, dx, dy, sWidth, sHeight);
-  nvgFillPaint(vg, imgPaint);
-  nvgFill(vg);
-  nvgRestore(vg);
-
 }
 
 void NanoVGContext::beginPath() {

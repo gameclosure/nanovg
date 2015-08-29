@@ -1,0 +1,4 @@
+Only firefox will run this without a server
+
+Other browsers will produce errors like
+Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The cross-origin image at file:///nanovg/emscripten/test/image.png may not be loaded

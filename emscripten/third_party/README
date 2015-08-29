@@ -1,0 +1,8 @@
+location: https://github.com/mozilla/gecko-dev.git
+folder: 
+commit: 1d04070e5b020c182efb23205c51523f39fb1c64
+merge: 125759f 2e0b4b0
+author: Ryan VanderMeulen <ryanvm@gmail.com>
+date:   Mon Aug 24 20:57:36 2015 -0400
+
+    Merge fx-team to m-c. a=merge

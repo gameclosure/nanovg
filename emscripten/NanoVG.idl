@@ -1,0 +1,38 @@
+//python emscripten/tools/webidl_binder.py NanoVG.idl glue
+
+interface NanoVGContext {
+  void NanoVGContext(long rWidth, long rHeight);
+
+  void createTextureFromImage(long sWidth, long sHeight);
+
+  void glBeginLoop();
+  void glEndLoop();
+
+  void save();
+  void restore();
+
+  void translate(long x, long y);
+  void rect(long x, long y, long w, long h);
+  void rotate(float angle);
+  void scale(float x, float y);
+
+  void scissor(long x, long y, long w, long h);
+
+  void drawImage(long image, long sx, long sy, long sWidth, long sHeight, long dx, long dy, long dWidth, long dHeight, long tWidth, long tHeight, long alpha);
+  void beginPath();
+  void closePath();
+  void stroke();
+  void moveTo(long x, long y);
+  void lineTo(long x, long y);
+  void fillRect(long x, long y, long width, long height);
+  void clearRect(long x, long y, long width, long height);
+  void fill();
+  void fillText(DOMString text, long x, long y);
+  void strokeText(DOMString text, long x, long y);
+
+  attribute DOMString fillStyle;
+  attribute DOMString textAlign;
+  attribute DOMString font;
+
+  attribute long drawImageMapID;
+};

@@ -278,6 +278,12 @@ NanoVGContext.prototype['strokeText'] = NanoVGContext.prototype.strokeText = fun
   _emscripten_bind_NanoVGContext_strokeText_3(self, arg0, arg1, arg2);
 };;
 
+NanoVGContext.prototype['set_globalAlpha'] = NanoVGContext.prototype.set_globalAlpha = function(arg0) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  _emscripten_bind_NanoVGContext_set_globalAlpha_1(self, arg0);
+};;
+
   NanoVGContext.prototype['get_fillStyle'] = NanoVGContext.prototype.get_fillStyle = function() {
   var self = this.ptr;
   return Pointer_stringify(_emscripten_bind_NanoVGContext_get_fillStyle_0(self));

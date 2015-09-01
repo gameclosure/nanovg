@@ -103,6 +103,10 @@ void EMSCRIPTEN_KEEPALIVE emscripten_bind_NanoVGContext_strokeText_3(NanoVGConte
   self->strokeText(arg0, arg1, arg2);
 }
 
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_NanoVGContext_set_globalAlpha_1(NanoVGContext* self, float arg0) {
+  self->set_globalAlpha(arg0);
+}
+
 char* EMSCRIPTEN_KEEPALIVE emscripten_bind_NanoVGContext_get_fillStyle_0(NanoVGContext* self) {
   return self->fillStyle;
 }

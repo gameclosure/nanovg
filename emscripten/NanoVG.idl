@@ -30,6 +30,8 @@ interface NanoVGContext {
   void fillText(DOMString text, long x, long y);
   void strokeText(DOMString text, long x, long y);
 
+  void set_globalAlpha(float a);
+
   attribute DOMString fillStyle;
   attribute DOMString textAlign;
   attribute DOMString font;

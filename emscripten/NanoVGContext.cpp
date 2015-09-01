@@ -40,6 +40,7 @@ EM_ASM({
 #endif
   vg = nvgCreateGLES2(NVG_ANTIALIAS);
   displayingImage=0;
+  globalAlpha=1.0f;
   savestate=false;
 }
 
@@ -353,6 +354,11 @@ void NanoVGContext::scale(float x, float y) {
 
 void NanoVGContext::scissor(int x, int y, int w, int h){
   nvgScissor(vg, x, y, w, h);
+}
+
+void NanoVGContext::set_globalAlpha(float a) {
+    globalAlpha = a;
+	nvgGlobalAlpha(vg, a);
 }
 
  // STUB

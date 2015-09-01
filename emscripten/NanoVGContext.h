@@ -100,6 +100,10 @@ public:
   char *font;
   char *textAlign;
 
+  void set_globalAlpha(float a);
+
+  float globalAlpha;
+
 /*
     //Variables
     CanvasRenderingContext2D.canvas

@@ -166,6 +166,7 @@ def add_coloring_to_emit_ansi(fn):
   return new
 
 WINDOWS = sys.platform.startswith('win')
+OSX = sys.platform == 'darwin'
 
 if WINDOWS:
   logging.StreamHandler.emit = add_coloring_to_emit_windows(logging.StreamHandler.emit)
@@ -209,8 +210,10 @@ if not EM_CONFIG:
   EM_CONFIG = '~/.emscripten'
 if '\n' in EM_CONFIG:
   CONFIG_FILE = None
+  logging.debug('EM_CONFIG is specified inline without a file')
 else:
   CONFIG_FILE = os.path.expanduser(EM_CONFIG)
+  logging.debug('EM_CONFIG is located in ' + CONFIG_FILE)
   if not os.path.exists(CONFIG_FILE):
     # Note: repr is used to ensure the paths are escaped correctly on Windows.
     # The full string is replaced so that the template stays valid Python.
@@ -221,7 +224,7 @@ else:
     config_file = config_file.replace('\'{{{ EMSCRIPTEN_ROOT }}}\'', repr(__rootpath__))
     llvm_root = os.path.dirname(find_executable('llvm-dis') or '/usr/bin/llvm-dis')
     config_file = config_file.replace('\'{{{ LLVM_ROOT }}}\'', repr(llvm_root))
-    node = find_executable('node') or find_executable('nodejs') or 'node'
+    node = find_executable('nodejs') or find_executable('node') or 'node'
     config_file = config_file.replace('\'{{{ NODE }}}\'', repr(node))
     if WINDOWS:
       tempdir = os.environ.get('TEMP') or os.environ.get('TMP') or 'c:\\temp'
@@ -258,6 +261,12 @@ try:
 except Exception, e:
   logging.error('Error in evaluating %s (at %s): %s, text: %s' % (EM_CONFIG, CONFIG_FILE, str(e), config_text))
   sys.exit(1)
+
+# Returns a suggestion where current .emscripten config file might be located (if EM_CONFIG env. var is used 
+# without a file, this hints to "default" location at ~/.emscripten)
+def hint_config_file_location():
+  if CONFIG_FILE: return CONFIG_FILE
+  else: return '~/.emscripten'
 
 def listify(x):
   if type(x) is not list: return [x]
@@ -306,7 +315,7 @@ EM_BUILD_VERBOSE_LEVEL = int(os.getenv('EM_BUILD_VERBOSE')) if os.getenv('EM_BUI
 
 # Expectations
 
-EXPECTED_LLVM_VERSION = (3, 7)
+EXPECTED_LLVM_VERSION = (3, 8)
 
 actual_clang_version = None
 
@@ -361,20 +370,32 @@ def check_fastcomp():
       logging.critical('you can fall back to the older (pre-fastcomp) compiler core, although that is not recommended, see http://kripken.github.io/emscripten-site/docs/building_from_source/LLVM-Backend.html')
       return False
 
+    # check repo versions
     d = get_fastcomp_src_dir()
+    shown_repo_version_error = False
     if d is not None:
-      llvm_version = open(os.path.join(d, 'emscripten-version.txt')).read().strip()
+      llvm_version = get_emscripten_version(os.path.join(d, 'emscripten-version.txt'))
       if os.path.exists(os.path.join(d, 'tools', 'clang', 'emscripten-version.txt')):
-        clang_version = open(os.path.join(d, 'tools', 'clang', 'emscripten-version.txt')).read().strip()
+        clang_version = get_emscripten_version(os.path.join(d, 'tools', 'clang', 'emscripten-version.txt'))
       elif os.path.exists(os.path.join(d, 'tools', 'clang')):
         clang_version = '?' # Looks like the LLVM compiler tree has an old checkout from the time before it contained a version.txt: Should update!
       else:
         clang_version = llvm_version # This LLVM compiler tree does not have a tools/clang, so it's probably an out-of-source build directory. No need for separate versioning.
       if EMSCRIPTEN_VERSION != llvm_version or EMSCRIPTEN_VERSION != clang_version:
-        logging.error('Emscripten, llvm and clang versions do not match, this is dangerous (%s, %s, %s)', EMSCRIPTEN_VERSION, llvm_version, clang_version)
+        logging.error('Emscripten, llvm and clang repo versions do not match, this is dangerous (%s, %s, %s)', EMSCRIPTEN_VERSION, llvm_version, clang_version)
         logging.error('Make sure to use the same branch in each repo, and to be up-to-date on each. See http://kripken.github.io/emscripten-site/docs/building_from_source/LLVM-Backend.html')
+        shown_repo_version_error = True
     else:
       logging.warning('did not see a source tree above or next to the LLVM root directory (guessing based on directory of %s), could not verify version numbers match' % LLVM_COMPILER)
+
+    # check build versions. don't show it if the repos are wrong, user should fix that first
+    if not shown_repo_version_error:
+      clang_v = Popen([CLANG, '--version'], stdout=PIPE).communicate()[0]
+      llvm_build_version, clang_build_version = clang_v.split('(emscripten ')[1].split(')')[0].split(' : ')
+      if EMSCRIPTEN_VERSION != llvm_build_version or EMSCRIPTEN_VERSION != clang_build_version:
+        logging.error('Emscripten, llvm and clang build versions do not match, this is dangerous (%s, %s, %s)', EMSCRIPTEN_VERSION, llvm_build_version, clang_build_version)
+        logging.error('Make sure to rebuild llvm and clang after updating repos')
+
     return True
   except Exception, e:
     logging.warning('could not check fastcomp: %s' % str(e))
@@ -394,6 +415,17 @@ def check_node_version():
     logging.warning('cannot check node version: %s',  e)
     return False
 
+def check_closure_compiler():
+  try:
+    subprocess.call([JAVA, '-version'], stdout=PIPE, stderr=PIPE)
+  except:
+    logging.warning('java does not seem to exist, required for closure compiler, which is optional (define JAVA in ' + hint_config_file_location() + ' if you want it)')
+    return False
+  if not os.path.exists(CLOSURE_COMPILER):
+    logging.warning('Closure compiler (%s) does not exist, check the paths in %s' % (CLOSURE_COMPILER, EM_CONFIG))
+    return False
+  return True
+
 # Finds the system temp directory without resorting to using the one configured in .emscripten
 def find_temp_directory():
   if WINDOWS:
@@ -408,6 +440,9 @@ def find_temp_directory():
   else:
     return '/tmp'
 
+def get_emscripten_version(path):
+  return open(path).read().strip().replace('"', '')
+
 # Check that basic stuff we need (a JS engine to compile, Node.js, and Clang and LLVM)
 # exists.
 # The test runner always does this check (through |force|). emcc does this less frequently,
@@ -416,7 +451,7 @@ def find_temp_directory():
 # We also re-check sanity and clear the cache when the version changes
 
 try:
-  EMSCRIPTEN_VERSION = open(path_from_root('emscripten-version.txt')).read().strip()
+  EMSCRIPTEN_VERSION = get_emscripten_version(path_from_root('emscripten-version.txt'))
   try:
     parts = map(int, EMSCRIPTEN_VERSION.split('.'))
     EMSCRIPTEN_VERSION_MAJOR = parts[0]
@@ -497,15 +532,9 @@ def check_sanity(force=False):
       logging.critical('failing sanity checks due to previous fastcomp failure')
       sys.exit(1)
 
-    try:
-      subprocess.call([JAVA, '-version'], stdout=PIPE, stderr=PIPE)
-    except:
-      logging.warning('java does not seem to exist, required for closure compiler, which is optional (define JAVA in ~/.emscripten if you want it)')
-
-    if not os.path.exists(CLOSURE_COMPILER):
-     logging.warning('Closure compiler (%s) does not exist, check the paths in %s. -O2 and above will fail' % (CLOSURE_COMPILER, EM_CONFIG))
-
     # Sanity check passed!
+    if not check_closure_compiler():
+      logging.warning('closure compiler will not be available')
 
     if not force:
       # Only create/update this file if the sanity check succeeded, i.e., we got here
@@ -563,7 +592,7 @@ def get_clang_native_args():
   global CACHED_CLANG_NATIVE_ARGS
   if CACHED_CLANG_NATIVE_ARGS is not None: return CACHED_CLANG_NATIVE_ARGS
   CACHED_CLANG_NATIVE_ARGS = []
-  if sys.platform == 'darwin':
+  if OSX:
     sdk_path = osx_find_native_sdk_path()
     if sdk_path:
       CACHED_CLANG_NATIVE_ARGS = ['-isysroot', osx_find_native_sdk_path()]
@@ -571,6 +600,51 @@ def get_clang_native_args():
     CACHED_CLANG_NATIVE_ARGS = ['-DWIN32']
     # TODO: If Windows.h et al. are needed, will need to add something like '-isystemC:/Program Files (x86)/Microsoft SDKs/Windows/v7.1A/Include'.
   return CACHED_CLANG_NATIVE_ARGS
+
+# This environment needs to be present when targeting a native host system executable
+CACHED_CLANG_NATIVE_ENV=None
+def get_clang_native_env():
+  global CACHED_CLANG_NATIVE_ENV
+  if CACHED_CLANG_NATIVE_ENV is not None: return CACHED_CLANG_NATIVE_ENV
+  env = os.environ.copy()
+
+  if WINDOWS:
+    # If already running in Visual Studio Command Prompt manually, no need to add anything here, so just return.
+    if 'VSINSTALLDIR' in env and 'INCLUDE' in env and 'LIB' in env:
+      CACHED_CLANG_NATIVE_ENV = env
+      return env
+
+    if 'VSINSTALLDIR' in env:
+      visual_studio_2013_path = env['VSINSTALLDIR']
+    elif 'VS120COMNTOOLS' in env:
+      visual_studio_2013_path = os.path.normpath(os.path.join(env['VS120COMNTOOLS'], '../..'))
+    elif 'ProgramFiles(x86)' in env:
+      visual_studio_2013_path = os.path.normpath(os.path.join(env['ProgramFiles(x86)'], 'Microsoft Visual Studio 12.0'))
+    elif 'ProgramFiles' in env:
+      visual_studio_2013_path = os.path.normpath(os.path.join(env['ProgramFiles'], 'Microsoft Visual Studio 12.0'))
+    else:
+      visual_studio_2013_path = 'C:\\Program Files (x86)\\Microsoft Visual Studio 12.0'
+    if not os.path.isdir(visual_studio_2013_path):
+      raise Exception('Visual Studio 2013 was not found in "' + visual_studio_2013_path + '"! Run in Visual Studio command prompt to avoid the need to autoguess this location (or set VSINSTALLDIR env var).')
+
+    if 'WindowsSdkDir' in env:
+      windows_sdk_dir = env['WindowsSdkDir']
+    elif 'ProgramFiles(x86)' in env:
+      windows_sdk_dir = os.path.normpath(os.path.join(env['ProgramFiles(x86)'], 'Windows Kits\\8.1'))
+    elif 'ProgramFiles' in env:
+      windows_sdk_dir = os.path.normpath(os.path.join(env['ProgramFiles'], 'Windows Kits\\8.1'))
+    else:
+      windows_sdk_dir = 'C:\\Program Files (x86)\\Windows Kits\\8.1'
+    if not os.path.isdir(windows_sdk_dir):
+      raise Exception('Windows SDK was not found in "' + windows_sdk_dir + '"! Run in Visual Studio command prompt to avoid the need to autoguess this location (or set WindowsSdkDir env var).')
+
+    env['INCLUDE'] = os.path.join(visual_studio_2013_path, 'VC\\INCLUDE')
+    env['LIB'] = os.path.join(visual_studio_2013_path, 'VC\\LIB\\amd64') + ';' + os.path.join(windows_sdk_dir, 'lib\\winv6.3\\um\\x64')
+
+  # Current configuration above is all Visual Studio -specific, so on non-Windowses, no action needed.
+
+  CACHED_CLANG_NATIVE_ENV = env
+  return env
 
 CLANG_CC=os.path.expanduser(build_clang_tool_path('clang'))
 CLANG_CPP=os.path.expanduser(build_clang_tool_path('clang++'))
@@ -638,8 +712,8 @@ class Configuration:
     except NameError:
       self.TEMP_DIR = find_temp_directory()
       if self.TEMP_DIR == None:
-        logging.critical('TEMP_DIR not defined in ' + os.path.expanduser('~\\.emscripten') + ", and could not detect a suitable directory! Please configure .emscripten to contain a variable TEMP_DIR='/path/to/temp/dir'.")
-      logging.debug('TEMP_DIR not defined in ~/.emscripten, using ' + self.TEMP_DIR)
+        logging.critical('TEMP_DIR not defined in ' + hint_config_file_location() + ", and could not detect a suitable directory! Please configure .emscripten to contain a variable TEMP_DIR='/path/to/temp/dir'.")
+      logging.debug('TEMP_DIR not defined in ' + hint_config_file_location() + ', using ' + self.TEMP_DIR)
 
     if not os.path.isdir(self.TEMP_DIR):
       logging.critical("The temp directory TEMP_DIR='" + self.TEMP_DIR + "' doesn't seem to exist! Please make sure that the path is correct.")
@@ -651,7 +725,7 @@ class Configuration:
         self.EMSCRIPTEN_TEMP_DIR = self.CANONICAL_TEMP_DIR
         safe_ensure_dirs(self.EMSCRIPTEN_TEMP_DIR)
       except Exception, e:
-        logging.error(str(e) + 'Could not create canonical temp dir. Check definition of TEMP_DIR in ~/.emscripten')
+        logging.error(str(e) + 'Could not create canonical temp dir. Check definition of TEMP_DIR in ' + hint_config_file_location())
 
   def get_temp_files(self):
     return tempfiles.TempFiles(
@@ -693,13 +767,13 @@ except:
 try:
   PYTHON
 except:
-  logging.debug('PYTHON not defined in ~/.emscripten, using "%s"' % (sys.executable,))
+  logging.debug('PYTHON not defined in ' + hint_config_file_location() + ', using "%s"' % (sys.executable,))
   PYTHON = sys.executable
 
 try:
   JAVA
 except:
-  logging.debug('JAVA not defined in ~/.emscripten, using "java"')
+  logging.debug('JAVA not defined in ' + hint_config_file_location() + ', using "java"')
   JAVA = 'java'
 
 # Additional compiler options
@@ -1398,13 +1472,14 @@ class Building:
       assert out, 'must provide out if llvm_opt on a list of inputs'
     if type(opts) is int:
       opts = Building.pick_llvm_opts(opts)
+    assert len(opts) > 0, 'should not call opt with nothing to do'
     opts = opts[:]
     #opts += ['-debug-pass=Arguments']
     if get_clang_version() >= '3.4':
       if not Settings.SIMD:
         opts += ['-disable-loop-vectorization', '-disable-slp-vectorization', '-vectorize-loops=false', '-vectorize-slp=false', '-vectorize-slp-aggressive=false']
       else:
-        opts += ['-bb-vectorize-vector-bits=128', '-force-vector-width=4']
+        opts += ['-bb-vectorize-vector-bits=128']
 
     logging.debug('emcc: LLVM opts: ' + ' '.join(opts) + '  [num inputs: ' + str(len(inputs)) + ']')
     target = out or (filename + '.opt.bc')
@@ -1500,20 +1575,16 @@ class Building:
     # Allow usage of emscripten.py without warning
     os.environ['EMSCRIPTEN_SUPPRESS_USAGE_WARNING'] = '1'
 
+    if path_from_root() not in sys.path:
+      sys.path += [path_from_root()]
+    from emscripten import _main as call_emscripten
     # Run Emscripten
     settings = Settings.serialize()
     args = settings + extra_args
-    if WINDOWS:
-      rsp_file = response_file.create_response_file(args, TEMP_DIR)
-      args = ['@' + rsp_file]
-    cmdline = [PYTHON, EMSCRIPTEN, filename + ('.o.ll' if append_ext else ''), '-o', filename + '.o.js'] + args
+    cmdline = [filename + ('.o.ll' if append_ext else ''), '-o', filename + '.o.js'] + args
     if jsrun.TRACK_PROCESS_SPAWNS:
       logging.info('Executing emscripten.py compiler with cmdline "' + ' '.join(cmdline) + '"')
-    jsrun.timeout_run(Popen(cmdline, stdout=PIPE), None, 'Compiling')
-
-    # Clean up .rsp file the compiler used after we are finished.
-    if WINDOWS:
-      try_delete(rsp_file)
+    call_emscripten(cmdline)
 
     # Detect compilation crashes and errors
     assert os.path.exists(filename + '.o.js'), 'Emscripten failed to generate .js'
@@ -1522,7 +1593,7 @@ class Building:
 
   @staticmethod
   def can_build_standalone():
-    return not Settings.BUILD_AS_SHARED_LIB and not Settings.LINKABLE and not Settings.EXPORT_ALL and not Settings.MAIN_MODULE and not Settings.SIDE_MODULE
+    return not Settings.BUILD_AS_SHARED_LIB and not Settings.LINKABLE
 
   @staticmethod
   def can_inline():
@@ -1531,10 +1602,27 @@ class Building:
   @staticmethod
   def get_safe_internalize():
     if not Building.can_build_standalone(): return [] # do not internalize anything
+
     exps = expand_response(Settings.EXPORTED_FUNCTIONS)
-    exports = ','.join(map(lambda exp: exp[1:], exps))
+    internalize_public_api = '-internalize-public-api-'
+    internalize_list = ','.join(map(lambda exp: exp[1:], exps))
+
+    # EXPORTED_FUNCTIONS can potentially be very large.
+    # 8k is a bit of an arbitrary limit, but a reasonable one
+    # for max command line size before we use a response file
+    if len(internalize_list) > 8192:
+      logging.debug('using response file for EXPORTED_FUNCTIONS in internalize')
+      finalized_exports = '\n'.join(map(lambda exp: exp[1:], exps))
+      internalize_list_file = configuration.get_temp_files().get(suffix='.response').name
+      internalize_list_fh = open(internalize_list_file, 'w')
+      internalize_list_fh.write(finalized_exports)
+      internalize_list_fh.close()
+      internalize_public_api += 'file=' + internalize_list_file
+    else:
+      internalize_public_api += 'list=' + internalize_list
+
     # internalize carefully, llvm 3.2 will remove even main if not told not to
-    return ['-internalize', '-internalize-public-api-list=' + exports]
+    return ['-internalize', internalize_public_api]
 
   @staticmethod
   def pick_llvm_opts(optimization_level):
@@ -1567,8 +1655,9 @@ class Building:
 
   @staticmethod
   def closure_compiler(filename, pretty=True):
-    if not os.path.exists(CLOSURE_COMPILER):
-      raise Exception('Closure compiler appears to be missing, looked at: ' + str(CLOSURE_COMPILER))
+    if not check_closure_compiler():
+      logging.error('Cannot run closure compiler')
+      raise Exception('closure compiler check failed')
 
     CLOSURE_EXTERNS = path_from_root('src', 'closure-externs.js')
     NODE_EXTERNS_BASE = path_from_root('third_party', 'closure-compiler', 'node-externs')
@@ -1825,22 +1914,6 @@ class JS:
     def escape(x): return '\\x{:02x}'.format(ord(x.group()))
     return re.sub('[\x80-\xff]', escape, s)
 
-# Compression of code and data for smaller downloads
-class Compression:
-  on = False
-
-  @staticmethod
-  def compressed_name(filename):
-    return filename + '.compress'
-
-  @staticmethod
-  def compress(filename):
-    execute(Compression.encoder, stdin=open(filename, 'rb'), stdout=open(Compression.compressed_name(filename), 'wb'))
-
-  @staticmethod
-  def worth_it(original, compressed):
-    return compressed < original - 1500 # save at least one TCP packet or so
-
 def execute(cmd, *args, **kw):
   try:
     return Popen(cmd, *args, **kw).communicate() # let compiler frontend print directly, so colors are saved (PIPE kills that)
@@ -1854,7 +1927,6 @@ def check_execute(cmd, *args, **kw):
   # TODO: use in more places. execute doesn't actually check that return values
   # are nonzero
   try:
-    kw['stderr'] = STDOUT
     subprocess.check_output(cmd, *args, **kw)
     logging.debug("Successfuly executed %s" % " ".join(cmd))
   except subprocess.CalledProcessError as e:
@@ -1864,7 +1936,7 @@ def check_execute(cmd, *args, **kw):
 def check_call(cmd, *args, **kw):
   try:
     subprocess.check_call(cmd, *args, **kw)
-    logging.debug("Successfuly executed %s" % " ".join(cmd))
+    logging.debug("Successfully executed %s" % " ".join(cmd))
   except subprocess.CalledProcessError as e:
     logging.error("'%s' failed" % " ".join(cmd))
     raise

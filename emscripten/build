@@ -1,5 +1,5 @@
 #!/bin/bash
 python ./tools/nanovg_binder.py NanoVG.idl glue
-~/Downloads/emsdk_portable/emscripten/tag-1.34.5/emcc -s TOTAL_MEMORY=60000000 -s USE_JSIO=1 -s USE_GLFW=3 -s FULL_ES2=1 -I../src NanoVGContext.cpp glue.cpp rgba.c ../src/nanovg.c --post-js glue.js -o nanovg.js -DNANOVG_GLEW -DEMSCRIPTEN -O0
+~/Downloads/emsdk_portable/emscripten/tag-1.35.7/emcc -s TOTAL_MEMORY=60000000 -s USE_JSIO=1 -s USE_GLFW=3 -s FULL_ES2=1 -I../src NanoVGContext.cpp glue.cpp rgba.c ../src/nanovg.c --post-js glue.js -o nanovg.js -DNANOVG_GLEW -DEMSCRIPTEN -O1
 #-s TOTAL_MEMORY=60000000
 #-s ALLOW_MEMORY_GROWTH=1

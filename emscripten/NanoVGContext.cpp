@@ -357,8 +357,13 @@ void NanoVGContext::scissor(int x, int y, int w, int h){
 }
 
 void NanoVGContext::set_globalAlpha(float a) {
-    globalAlpha = a;
-	nvgGlobalAlpha(vg, a);
+  globalAlpha = a;
+  nvgGlobalAlpha(vg, a);
+}
+
+void NanoVGContext::setTransform(float a, float b, float c, float d, float e, float f) {
+  nvgResetTransform(vg);
+  nvgTransform(vg, a, b, c, d, e, f);
 }
 
  // STUB

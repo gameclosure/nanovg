@@ -23,11 +23,11 @@ DEBUG = os.environ.get('EMCC_DEBUG')
 
 func_sig = re.compile('function ([_\w$]+)\(')
 func_sig_json = re.compile('\["defun", ?"([_\w$]+)",')
-import_sig = re.compile('var ([_\w$]+) *=[^;]+;')
+import_sig = re.compile('(var|const) ([_\w$]+ *=[^;]+);')
 
-NATIVE_OPTIMIZER = os.environ.get('EMCC_NATIVE_OPTIMIZER') or '1' # use native optimizer by default, unless disabled by EMCC_NATIVE_OPTIMIZER=0 in the env
+NATIVE_OPTIMIZER = os.environ.get('EMCC_NATIVE_OPTIMIZER') or '2' # use optimized native optimizer by default, unless disabled by EMCC_NATIVE_OPTIMIZER=0 in the env
 
-def split_funcs(js, just_split=False, know_generated=True):
+def split_funcs(js, just_split=False):
   if just_split: return map(lambda line: ('(json)', line), js.split('\n'))
   parts = map(lambda part: part, js.split('\n}\n'))
   funcs = []
@@ -38,8 +38,7 @@ def split_funcs(js, just_split=False, know_generated=True):
     if m:
       ident = m.group(1)
     else:
-      if know_generated: continue # ignore whitespace
-      ident = 'anon_%d' % i
+      continue
     assert ident
     funcs.append((ident, func))
   return funcs
@@ -153,6 +152,7 @@ def get_native_optimizer():
                                          shared.path_from_root('tools', 'optimizer', 'parser.cpp'),
                                          shared.path_from_root('tools', 'optimizer', 'simple_ast.cpp'),
                                          shared.path_from_root('tools', 'optimizer', 'optimizer.cpp'),
+                                         shared.path_from_root('tools', 'optimizer', 'optimizer-shared.cpp'),
                                          shared.path_from_root('tools', 'optimizer', 'optimizer-main.cpp'),
                                          '-O3', '-std=c++11', '-fno-exceptions', '-fno-rtti', '-o', output] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
             outs.append(out)
@@ -276,7 +276,7 @@ def run_on_chunk(command):
     if shared.EM_BUILD_VERBOSE_LEVEL >= 3: print >> sys.stderr, 'run_on_chunk: ' + str(command)
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
     output = proc.communicate()[0]
-    assert proc.returncode == 0, 'Error in optimizer: ' + output
+    assert proc.returncode == 0, 'Error in optimizer (return code ' + str(proc.returncode) + '): ' + output
     assert len(output) > 0 and not output.startswith('Assertion failed'), 'Error in optimizer: ' + output
     filename = temp_files.get(os.path.basename(filename) + '.jo.js').name
     # Important to write out in binary mode, because the data we are writing contains Windows line endings '\r\n' because it was PIPED from console.
@@ -306,13 +306,14 @@ def run_on_js(filename, passes, js_engine, source_map=False, extra_info=None, ju
     suffix_end = js.find('\n', suffix_start)
     suffix = js[suffix_start:suffix_end] + '\n'
     # if there is metadata, we will run only on the generated functions. If there isn't, we will run on everything.
-    generated = set(eval(suffix[len(suffix_marker)+1:]))
 
   # Find markers
   start_funcs = js.find(start_funcs_marker)
   end_funcs = js.rfind(end_funcs_marker)
 
-  know_generated = suffix or start_funcs >= 0
+  if start_funcs < 0 or end_funcs < start_funcs or not suffix:
+    logging.critical('Invalid input file. Did not contain appropriate markers. (start_funcs: %s, end_funcs: %s, suffix_start: %s' % (start_funcs, end_funcs, suffix_start))
+    sys.exit(1)
 
   minify_globals = 'minifyNames' in passes and 'asm' in passes
   if minify_globals:
@@ -329,61 +330,58 @@ def run_on_js(filename, passes, js_engine, source_map=False, extra_info=None, ju
   if cleanup:
     passes = filter(lambda p: p != 'cleanup', passes) # we will do it manually
 
-  if know_generated:
-    if not minify_globals:
-      pre = js[:start_funcs + len(start_funcs_marker)]
-      post = js[end_funcs + len(end_funcs_marker):]
-      js = js[start_funcs + len(start_funcs_marker):end_funcs]
-      if 'asm' not in passes: # can have Module[..] and inlining prevention code, push those to post
-        class Finals:
-          buf = []
-        def process(line):
-          if len(line) > 0 and (line.startswith(('Module[', 'if (globalScope)')) or line.endswith('["X"]=1;')):
-            Finals.buf.append(line)
-            return False
-          return True
-        js = '\n'.join(filter(process, js.split('\n')))
-        post = '\n'.join(Finals.buf) + '\n' + post
-      post = end_funcs_marker + post
-    else:
-      # We need to split out the asm shell as well, for minification
-      pre = js[:start_asm + len(start_asm_marker)]
-      post = js[end_asm:]
-      asm_shell = js[start_asm + len(start_asm_marker):start_funcs + len(start_funcs_marker)] + '''
-EMSCRIPTEN_FUNCS();
-''' + js[end_funcs + len(end_funcs_marker):end_asm + len(end_asm_marker)]
-      js = js[start_funcs + len(start_funcs_marker):end_funcs]
+  split_memory = 'splitMemory' in passes
 
-      # we assume there is a maximum of one new name per line
-      minifier = Minifier(js, js_engine)
-      def check_symbol_mapping(p):
-        if p.startswith('symbolMap='):
-          minifier.symbols_file = p.split('=')[1]
-          return False
-        if p == 'profilingFuncs':
-          minifier.profiling_funcs = True
+  if not minify_globals:
+    pre = js[:start_funcs + len(start_funcs_marker)]
+    post = js[end_funcs + len(end_funcs_marker):]
+    js = js[start_funcs + len(start_funcs_marker):end_funcs]
+    if 'asm' not in passes: # can have Module[..] and inlining prevention code, push those to post
+      class Finals:
+        buf = []
+      def process(line):
+        if len(line) > 0 and (line.startswith(('Module[', 'if (globalScope)')) or line.endswith('["X"]=1;')):
+          Finals.buf.append(line)
           return False
         return True
-      passes = filter(check_symbol_mapping, passes)
-      asm_shell_pre, asm_shell_post = minifier.minify_shell(asm_shell, 'minifyWhitespace' in passes, source_map).split('EMSCRIPTEN_FUNCS();');
-      asm_shell_post = asm_shell_post.replace('});', '})');
-      pre += asm_shell_pre + '\n' + start_funcs_marker
-      post = end_funcs_marker + asm_shell_post + post
-
-      minify_info = minifier.serialize()
-      #if DEBUG: print >> sys.stderr, 'minify info:', minify_info
-    # remove suffix if no longer needed
-    if suffix and 'last' in passes:
-      suffix_start = post.find(suffix_marker)
-      suffix_end = post.find('\n', suffix_start)
-      post = post[:suffix_start] + post[suffix_end:]
-
+      js = '\n'.join(filter(process, js.split('\n')))
+      post = '\n'.join(Finals.buf) + '\n' + post
+    post = end_funcs_marker + post
   else:
-    pre = ''
-    post = ''
+    # We need to split out the asm shell as well, for minification
+    pre = js[:start_asm + len(start_asm_marker)]
+    post = js[end_asm:]
+    asm_shell = js[start_asm + len(start_asm_marker):start_funcs + len(start_funcs_marker)] + '''
+EMSCRIPTEN_FUNCS();
+''' + js[end_funcs + len(end_funcs_marker):end_asm + len(end_asm_marker)]
+    js = js[start_funcs + len(start_funcs_marker):end_funcs]
+
+    # we assume there is a maximum of one new name per line
+    minifier = Minifier(js, js_engine)
+    def check_symbol_mapping(p):
+      if p.startswith('symbolMap='):
+        minifier.symbols_file = p.split('=')[1]
+        return False
+      if p == 'profilingFuncs':
+        minifier.profiling_funcs = True
+        return False
+      return True
+    passes = filter(check_symbol_mapping, passes)
+    asm_shell_pre, asm_shell_post = minifier.minify_shell(asm_shell, 'minifyWhitespace' in passes, source_map).split('EMSCRIPTEN_FUNCS();');
+    asm_shell_post = asm_shell_post.replace('});', '})');
+    pre += asm_shell_pre + '\n' + start_funcs_marker
+    post = end_funcs_marker + asm_shell_post + post
+
+    minify_info = minifier.serialize()
+    #if DEBUG: print >> sys.stderr, 'minify info:', minify_info
+  # remove suffix if no longer needed
+  if suffix and 'last' in passes:
+    suffix_start = post.find(suffix_marker)
+    suffix_end = post.find('\n', suffix_start)
+    post = post[:suffix_start] + post[suffix_end:]
 
   total_size = len(js)
-  funcs = split_funcs(js, just_split, know_generated)
+  funcs = split_funcs(js, just_split)
   js = None
 
   # if we are making source maps, we want our debug numbering to start from the
@@ -409,13 +407,12 @@ EMSCRIPTEN_FUNCS();
       f.write(chunk)
       f.write(suffix_marker)
       if minify_globals:
-        if know_generated:
-          if extra_info:
-            for key, value in extra_info.iteritems():
-              assert key not in minify_info or value == minify_info[key], [key, value, minify_info[key]]
-              minify_info[key] = value
-          f.write('\n')
-          f.write('// EXTRA_INFO:' + json.dumps(minify_info))
+        if extra_info:
+          for key, value in extra_info.iteritems():
+            assert key not in minify_info or value == minify_info[key], [key, value, minify_info[key]]
+            minify_info[key] = value
+        f.write('\n')
+        f.write('// EXTRA_INFO:' + json.dumps(minify_info))
       elif extra_info:
         f.write('\n')
         f.write('// EXTRA_INFO:' + json.dumps(extra_info))
@@ -424,6 +421,9 @@ EMSCRIPTEN_FUNCS();
     filenames = [write_chunk(chunks[i], i) for i in range(len(chunks))]
   else:
     filenames = []
+
+  if shared.Settings.WASM:
+    passes = filter(lambda p: p != 'minifyWhitespace', passes) # if we are going to wasmify the asm module, no need to minify it before hand
 
   if len(filenames) > 0:
     if not use_native(passes, source_map) or not get_native_optimizer():
@@ -452,7 +452,7 @@ EMSCRIPTEN_FUNCS();
 
   for filename in filenames: temp_files.note(filename)
 
-  if closure or cleanup:
+  if closure or cleanup or split_memory:
     # run on the shell code, everything but what we js-optimize
     start_asm = '// EMSCRIPTEN_START_ASM\n'
     end_asm = '// EMSCRIPTEN_END_ASM\n'
@@ -466,14 +466,23 @@ EMSCRIPTEN_FUNCS();
     c.write(cl_sep)
     c.write(post_2)
     c.close()
+    cld = cle
+    if split_memory:
+      if DEBUG: print >> sys.stderr, 'running splitMemory on shell code'
+      cld = run_on_chunk(js_engine + [JS_OPTIMIZER, cld, 'splitMemoryShell'])
+      f = open(cld, 'a')
+      f.write(suffix_marker)
+      f.close()
     if closure:
       if DEBUG: print >> sys.stderr, 'running closure on shell code'
-      cld = shared.Building.closure_compiler(cle, pretty='minifyWhitespace' not in passes)
-    else:
+      cld = shared.Building.closure_compiler(cld, pretty='minifyWhitespace' not in passes)
+      temp_files.note(cld)
+    elif cleanup:
       if DEBUG: print >> sys.stderr, 'running cleanup on shell code'
-      cld = cle + '.js'
-      subprocess.Popen(js_engine + [JS_OPTIMIZER, cle, 'noPrintMetadata'] + (['minifyWhitespace'] if 'minifyWhitespace' in passes else []), stdout=open(cld, 'w')).communicate()
-    temp_files.note(cld)
+      next = cld + '.cl.js'
+      temp_files.note(next)
+      subprocess.Popen(js_engine + [JS_OPTIMIZER, cld, 'noPrintMetadata'] + (['minifyWhitespace'] if 'minifyWhitespace' in passes else []), stdout=open(next, 'w')).communicate()
+      cld = next
     coutput = open(cld).read()
     coutput = coutput.replace('wakaUnknownBefore();', start_asm)
     after = 'wakaUnknownAfter'
@@ -491,7 +500,7 @@ EMSCRIPTEN_FUNCS();
     # sort functions by size, to make diffing easier and to improve aot times
     funcses = []
     for out_file in filenames:
-      funcses.append(split_funcs(open(out_file).read(), False, know_generated))
+      funcses.append(split_funcs(open(out_file).read(), False))
     funcs = [item for sublist in funcses for item in sublist]
     funcses = None
     def sorter(x, y):

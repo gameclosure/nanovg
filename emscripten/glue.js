@@ -151,6 +151,11 @@ NanoVGContext.prototype['restore'] = NanoVGContext.prototype.restore = function(
   _emscripten_bind_NanoVGContext_restore_0(self);
 };;
 
+NanoVGContext.prototype['clear'] = NanoVGContext.prototype.clear = function() {
+  var self = this.ptr;
+  _emscripten_bind_NanoVGContext_clear_0(self);
+};;
+
 NanoVGContext.prototype['translate'] = NanoVGContext.prototype.translate = function(arg0, arg1) {
   var self = this.ptr;
   if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
@@ -191,7 +196,7 @@ NanoVGContext.prototype['scissor'] = NanoVGContext.prototype.scissor = function(
 
 NanoVGContext.prototype['drawImage'] = NanoVGContext.prototype.drawImage = function(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
   var self = this.ptr;
-  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  //if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
   if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
   if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
   if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
@@ -203,7 +208,7 @@ NanoVGContext.prototype['drawImage'] = NanoVGContext.prototype.drawImage = funct
   if (arg9 && typeof arg9 === 'object') arg9 = arg9.ptr;
   if (arg10 && typeof arg10 === 'object') arg10 = arg10.ptr;
   if (arg11 && typeof arg11 === 'object') arg11 = arg11.ptr;
-  _emscripten_bind_NanoVGContext_drawImage_12(self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+  _emscripten_bind_NanoVGContext_drawImage_12(self, arg0.__gl_name, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 };;
 
 NanoVGContext.prototype['beginPath'] = NanoVGContext.prototype.beginPath = function() {
@@ -244,6 +249,15 @@ NanoVGContext.prototype['fillRect'] = NanoVGContext.prototype.fillRect = functio
   _emscripten_bind_NanoVGContext_fillRect_4(self, arg0, arg1, arg2, arg3);
 };;
 
+NanoVGContext.prototype['strokeRect'] = NanoVGContext.prototype.strokeRect = function(arg0, arg1, arg2, arg3) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
+  if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
+  if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
+  _emscripten_bind_NanoVGContext_strokeRect_4(self, arg0, arg1, arg2, arg3);
+};;
+
 NanoVGContext.prototype['clearRect'] = NanoVGContext.prototype.clearRect = function(arg0, arg1, arg2, arg3) {
   var self = this.ptr;
   if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
@@ -278,10 +292,70 @@ NanoVGContext.prototype['strokeText'] = NanoVGContext.prototype.strokeText = fun
   _emscripten_bind_NanoVGContext_strokeText_3(self, arg0, arg1, arg2);
 };;
 
+NanoVGContext.prototype['arc'] = NanoVGContext.prototype.arc = function(arg0, arg1, arg2, arg3, arg4, arg5) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
+  if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
+  if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
+  if (arg4 && typeof arg4 === 'object') arg4 = arg4.ptr;
+  if (arg5 && typeof arg5 === 'object') arg5 = arg5.ptr;
+  _emscripten_bind_NanoVGContext_arc_6(self, arg0, arg1, arg2, arg3, arg4, arg5);
+};;
+
+NanoVGContext.prototype['arcTo'] = NanoVGContext.prototype.arcTo = function(arg0, arg1, arg2, arg3, arg4) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
+  if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
+  if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
+  if (arg4 && typeof arg4 === 'object') arg4 = arg4.ptr;
+  _emscripten_bind_NanoVGContext_arcTo_5(self, arg0, arg1, arg2, arg3, arg4);
+};;
+
+NanoVGContext.prototype['bezierCurveTo'] = NanoVGContext.prototype.bezierCurveTo = function(arg0, arg1, arg2, arg3, arg4, arg5) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
+  if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
+  if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
+  if (arg4 && typeof arg4 === 'object') arg4 = arg4.ptr;
+  if (arg5 && typeof arg5 === 'object') arg5 = arg5.ptr;
+  _emscripten_bind_NanoVGContext_bezierCurveTo_6(self, arg0, arg1, arg2, arg3, arg4, arg5);
+};;
+
+NanoVGContext.prototype['quadraticCurveTo'] = NanoVGContext.prototype.quadraticCurveTo = function(arg0, arg1, arg2, arg3) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
+  if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
+  if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
+  _emscripten_bind_NanoVGContext_quadraticCurveTo_4(self, arg0, arg1, arg2, arg3);
+};;
+
 NanoVGContext.prototype['set_globalAlpha'] = NanoVGContext.prototype.set_globalAlpha = function(arg0) {
   var self = this.ptr;
   if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
   _emscripten_bind_NanoVGContext_set_globalAlpha_1(self, arg0);
+};;
+
+NanoVGContext.prototype['setTransform'] = NanoVGContext.prototype.setTransform = function(arg0, arg1, arg2, arg3, arg4, arg5) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  if (arg1 && typeof arg1 === 'object') arg1 = arg1.ptr;
+  if (arg2 && typeof arg2 === 'object') arg2 = arg2.ptr;
+  if (arg3 && typeof arg3 === 'object') arg3 = arg3.ptr;
+  if (arg4 && typeof arg4 === 'object') arg4 = arg4.ptr;
+  if (arg5 && typeof arg5 === 'object') arg5 = arg5.ptr;
+  _emscripten_bind_NanoVGContext_setTransform_6(self, arg0, arg1, arg2, arg3, arg4, arg5);
+};;
+
+NanoVGContext.prototype['measureText'] = NanoVGContext.prototype.measureText = function(arg0) {
+  var self = this.ptr;
+  ensureStringCache.prepare();
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  else arg0 = ensureString(arg0);
+  return _emscripten_bind_NanoVGContext_measureText_1(self, arg0);
 };;
 
   NanoVGContext.prototype['get_fillStyle'] = NanoVGContext.prototype.get_fillStyle = function() {
@@ -294,6 +368,17 @@ NanoVGContext.prototype['set_globalAlpha'] = NanoVGContext.prototype.set_globalA
   if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
   else arg0 = ensureString(arg0);
   _emscripten_bind_NanoVGContext_set_fillStyle_1(self, arg0);
+};
+  NanoVGContext.prototype['get_strokeStyle'] = NanoVGContext.prototype.get_strokeStyle = function() {
+  var self = this.ptr;
+  return Pointer_stringify(_emscripten_bind_NanoVGContext_get_strokeStyle_0(self));
+};
+    NanoVGContext.prototype['set_strokeStyle'] = NanoVGContext.prototype.set_strokeStyle = function(arg0) {
+  var self = this.ptr;
+  ensureStringCache.prepare();
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  else arg0 = ensureString(arg0);
+  _emscripten_bind_NanoVGContext_set_strokeStyle_1(self, arg0);
 };
   NanoVGContext.prototype['get_textAlign'] = NanoVGContext.prototype.get_textAlign = function() {
   var self = this.ptr;
@@ -317,6 +402,17 @@ NanoVGContext.prototype['set_globalAlpha'] = NanoVGContext.prototype.set_globalA
   else arg0 = ensureString(arg0);
   _emscripten_bind_NanoVGContext_set_font_1(self, arg0);
 };
+  NanoVGContext.prototype['get_text'] = NanoVGContext.prototype.get_text = function() {
+  var self = this.ptr;
+  return Pointer_stringify(_emscripten_bind_NanoVGContext_get_text_0(self));
+};
+    NanoVGContext.prototype['set_text'] = NanoVGContext.prototype.set_text = function(arg0) {
+  var self = this.ptr;
+  ensureStringCache.prepare();
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  else arg0 = ensureString(arg0);
+  _emscripten_bind_NanoVGContext_set_text_1(self, arg0);
+};
   NanoVGContext.prototype['get_drawImageMapID'] = NanoVGContext.prototype.get_drawImageMapID = function() {
   var self = this.ptr;
   return _emscripten_bind_NanoVGContext_get_drawImageMapID_0(self);
@@ -325,6 +421,15 @@ NanoVGContext.prototype['set_globalAlpha'] = NanoVGContext.prototype.set_globalA
   var self = this.ptr;
   if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
   _emscripten_bind_NanoVGContext_set_drawImageMapID_1(self, arg0);
+};
+  NanoVGContext.prototype['get_drawTextMapID'] = NanoVGContext.prototype.get_drawTextMapID = function() {
+  var self = this.ptr;
+  return _emscripten_bind_NanoVGContext_get_drawTextMapID_0(self);
+};
+    NanoVGContext.prototype['set_drawTextMapID'] = NanoVGContext.prototype.set_drawTextMapID = function(arg0) {
+  var self = this.ptr;
+  if (arg0 && typeof arg0 === 'object') arg0 = arg0.ptr;
+  _emscripten_bind_NanoVGContext_set_drawTextMapID_1(self, arg0);
 };
   NanoVGContext.prototype['__destroy__'] = NanoVGContext.prototype.__destroy__ = function() {
   var self = this.ptr;

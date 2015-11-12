@@ -11,6 +11,8 @@ interface NanoVGContext {
   void save();
   void restore();
 
+  void clear();
+
   void translate(long x, long y);
   void rect(long x, long y, long w, long h);
   void rotate(float angle);
@@ -25,16 +27,31 @@ interface NanoVGContext {
   void moveTo(long x, long y);
   void lineTo(long x, long y);
   void fillRect(long x, long y, long width, long height);
+  void strokeRect(long x, long y, long width, long height);
   void clearRect(long x, long y, long width, long height);
   void fill();
   void fillText(DOMString text, long x, long y);
   void strokeText(DOMString text, long x, long y);
 
+  void arc(float x, float y, float radius, float startAngle, float endAngle, boolean antiClockwise);
+  void arcTo(float x1, float y1, float x2, float y2, float radius);
+  void bezierCurveTo(float cpx1, float cpy1, float cpx2, float cpy2, float x, float y);
+  void quadraticCurveTo(float cpx, float cpy, float x, float y);
+
+
   void set_globalAlpha(float a);
+  void setTransform(float a, float b, float c, float d, float e, float f);
+
+  float measureText(DOMString text);
 
   attribute DOMString fillStyle;
+  attribute DOMString strokeStyle;
   attribute DOMString textAlign;
   attribute DOMString font;
 
+  attribute DOMString text;
+
   attribute long drawImageMapID;
+  attribute long drawTextMapID;
+
 };
